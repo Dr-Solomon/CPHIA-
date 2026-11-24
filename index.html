@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>The Respiratory Threat Landscape in Africa | CPHIA 2026 3D Explorer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Three.js & OrbitControls (r128 stable CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slateDark: '#060c14',
+            tealDeep: '#091926',
+            cyanGlow: '#22d3ee',
+            emeraldGlow: '#10b981',
+            coralGlow: '#f43f5e',
+            amberGlow: '#f59e0b',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #050a12;
+      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      cursor: grab;
+    }
+
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+
+    /* Glassmorphism Utilities */
+    .glass-panel {
+      background: rgba(9, 19, 32, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-pill {
+      background: rgba(15, 29, 46, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .glass-pill:hover {
+      background: rgba(20, 42, 66, 0.9);
+      border-color: rgba(34, 211, 238, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .glass-pill.active {
+      background: linear-gradient(135deg, rgba(14, 116, 144, 0.75), rgba(16, 185, 129, 0.35));
+      border-color: #22d3ee;
+      box-shadow: 0 0 20px rgba(34, 211, 238, 0.28);
+      color: #ffffff;
+    }
+
+    /* Custom Scrollbar for HUD cards */
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.3);
+      border-radius: 10px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.35);
+      border-radius: 10px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(56, 189, 248, 0.65);
+    }
+
+    /* Hide horizontal scrollbar on nav strip while keeping scrollability */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Pulse ring animation */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.75; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.08); }
+    }
+    .pulse-dot {
+      animation: pulseGlow 2.4s infinite ease-in-out;
+    }
+
+    /* Floating 3D Tooltip */
+    #tooltip-3d {
+      position: fixed;
+      pointer-events: none;
+      z-index: 40;
+      transition: opacity 0.15s ease, transform 0.1s ease;
+    }
+
+    /* Subtle scanline vignette */
+    .vignette-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      background: radial-gradient(circle at 50% 45%, transparent 55%, rgba(3, 7, 14, 0.72) 100%);
+    }
+  </style>
+</head>
+<body class="select-none">
+
+  <!-- 3D WebGL Viewport -->
+  <div id="canvas-container"></div>
+  <div class="vignette-overlay"></div>
+
+  <!-- 3D Raycast Hover Tooltip -->
+  <div id="tooltip-3d" class="opacity-0 glass-panel rounded-xl px-3.5 py-2.5 max-w-xs border-cyan-400/40">
+    <div id="tooltip-badge" class="text-[10px] font-mono uppercase tracking-wider text-cyan-300 mb-0.5">Node</div>
+    <div id="tooltip-title" class="text-xs sm:text-sm font-semibold text-white leading-snug">Title</div>
+    <div id="tooltip-desc" class="text-[11px] text-slate-300 mt-1 leading-relaxed">Details</div>
+  </div>
+
+  <!-- Top Header Bar -->
+  <header class="fixed top-0 left-0 right-0 z-20 p-3 sm:p-4 pointer-events-none">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2.5">
+      <!-- Brand / Conference Identity -->
+      <div class="glass-panel rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 pointer-events-auto flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/30 to-emerald-500/30 border border-cyan-400/40 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.364-6.364l-1.414 1.414M7.05 16.95l-1.414 1.414m12.728 0l-1.414-1.414M7.05 7.05L5.636 5.636M12 8a4 4 0 100 8 4 4 0 000-8z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+            <span class="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest text-cyan-300">CPHIA 2026 • Addis Ababa, Ethiopia</span>
+          </div>
+          <h1 class="text-xs sm:text-sm md:text-base font-bold text-white tracking-tight leading-tight">
+            The Respiratory Threat Landscape in Africa
+          </h1>
+        </div>
+      </div>
+
+      <!-- Right Controls: Auto-Tour, Reset Camera, Toggle HUD -->
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <button id="btn-autotour" onclick="toggleAutoTour()" class="glass-pill rounded-xl px-3 py-2 text-xs font-medium text-slate-200 flex items-center gap-1.5 cursor-pointer" title="Guided Presentation Tour">
+          <span id="tour-indicator" class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span id="tour-label">Auto-Tour</span>
+        </button>
+
+        <button onclick="resetCameraView()" class="glass-pill rounded-xl p-2 text-slate-200 hover:text-cyan-300 cursor-pointer" title="Reset 3D Camera Angle">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </button>
+
+        <button id="btn-toggle-hud" onclick="toggleHudPanel()" class="glass-pill rounded-xl px-3 py-2 text-xs font-medium text-cyan-300 flex items-center gap-1.5 cursor-pointer" title="Collapse/Expand Briefing Card">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <span class="hidden sm:inline" id="hud-toggle-text">Hide Panel</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Interactive Information HUD Panel (Left/Bottom-Adaptive) -->
+  <aside id="hud-panel" class="fixed z-20 left-3 right-3 sm:left-4 sm:right-auto top-20 sm:top-22 bottom-20 sm:bottom-24 sm:w-[410px] md:w-[440px] pointer-events-none flex flex-col justify-between transition-all duration-300">
+    <div id="hud-card" class="glass-panel rounded-2xl p-4 sm:p-5 pointer-events-auto overflow-y-auto custom-scroll max-h-full flex flex-col gap-3.5">
+      <!-- Dynamic Module Content Injected Here -->
+    </div>
+  </aside>
+
+  <!-- Contextual Scene Controls Pill (Right Side / Above Bottom Bar) -->
+  <div id="scene-controls-bar" class="fixed z-20 right-3 sm:right-4 bottom-20 sm:bottom-24 pointer-events-auto flex flex-col items-end gap-2">
+    <!-- Dynamic scene-specific interactive buttons (e.g., Submerge Iceberg, Toggle Surveillance Gap) -->
+  </div>
+
+  <!-- Bottom Module Navigation Dock -->
+  <nav class="fixed bottom-0 left-0 right-0 z-20 p-3 sm:p-4 pointer-events-none">
+    <div class="max-w-5xl mx-auto flex items-center justify-center">
+      <div class="glass-panel rounded-2xl p-1.5 pointer-events-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full">
+        <button onclick="switchModule(0)" data-mod="0" class="mod-btn glass-pill active rounded-xl px-3 py-2 text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 cursor-pointer">
+          <span class="text-cyan-300 font-mono">01</span>
+          <span>Overview</span>
+        </button>
+        <button onclick="switchModule(1)" data-mod="1" class="mod-btn glass-pill rounded-xl px-3 py-2 text-xs font-semibold text-slate-300 whitespace-nowrap flex items-center gap-1.5 cursor-pointer">
+          <span class="text-cyan-300 font-mono">02</span>
+          <span>Global Metrics</span>
+        </button>
+        <button onclick="switchModule(2)" data-mod="2" class="mod-btn glass-pill rounded-xl px-3 py-2 text-xs font-semibold text-slate-300 whitespace-nowrap flex items-center gap-1.5 cursor-pointer">
+          <span class="text-rose-400 font-mono">03</span>
+          <span>Missing Millions</span>
+        </button>
+        <button onclick="switchModule(3)" data-mod="3" class="mod-btn glass-pill rounded-xl px-3 py-2 text-xs font-semibold text-slate-300 whitespace-nowrap flex items-center gap-1.5 cursor-pointer">
+          <span class="text-emerald-400 font-mono">04</span>
+          <span>Economic Iceberg</span>
+        </button>
+        <button onclick="switchModule(4)" data-mod="4" class="mod-btn glass-pill rounded-xl px-3 py-2 text-xs font-semibold text-slate-300 whitespace-nowrap flex items-center gap-1.5 cursor-pointer">
+          <span class="text-amber-400 font-mono">05</span>
+          <span>Drivers & Risk</span>
+        </button>
+        <button onclick="switchModule(5)" data-mod="5" class="mod-btn glass-pill rounded-xl px-3 py-2 text-xs font-semibold text-slate-300 whitespace-nowrap flex items-center gap-1.5 cursor-pointer">
+          <span class="text-emerald-300 font-mono">06</span>
+          <span>Policy Pillars</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Subtle Interaction Hint Toast -->
+  <div id="interaction-hint" class="fixed bottom-16 left-1/2 -translate-x-1/2 z-10 pointer-events-none text-[11px] font-mono text-slate-400/80 hidden md:block">
+    Drag to orbit • Scroll to zoom • Click 3D nodes to inspect data
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * THE RESPIRATORY THREAT LANDSCAPE IN AFRICA — 3D INTERACTIVE APPLICATION
+     * Based on CPHIA 2026 Presentation by Awuor Nancy Otieno (KEMRI / ANISE)
+     * ============================================================================
+     */
+
+    // --- GLOBAL STATE ---
+    let scene, camera, renderer, controls, raycaster, mouse;
+    let currentModule = 0;
+    let clock = new THREE.Clock();
+    let moduleGroups = [];
+    let interactiveObjects = []; // Objects eligible for hover/click raycasting
+    let animatedMixers = [];     // Custom per-frame animations
+    let starfieldMesh;
+    let hudVisible = true;
+    let autoTourActive = false;
+    let autoTourTimer = null;
+
+    // Camera transition target state
+    const camTargetPos = new THREE.Vector3(0, 3.5, 13);
+    const camLookAtTarget = new THREE.Vector3(0, 0.5, 0);
+    let isTransitioningCamera = false;
+
+    // Interactive sub-states
+    let showSurveillanceGap = false;
+    let icebergSubmergedView = false;
+    let icebergDepthRatio = 0.25; // 0 = above water, 1 = deep underwater
+
+    // --- PRESENTATION DATA REPOSITORY (FROM SLIDES) ---
+    const MODULES_DATA = [
+      {
+        id: 0,
+        tag: "Module 01 • Keynote Briefing",
+        title: "The Respiratory Threat Landscape in Africa",
+        subtitle: "Influenza, RSV and COVID-19 burden, economic impact and policy implications",
+        accent: "cyan",
+        cameraPos: [0, 3.2, 12.5],
+        lookAt: [-1.8, 0.3, 0],
+        renderHTML: () => `
+          <div class="space-y-3.5">
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-[11px] font-mono">
+              <span>CPHIA 2026 • November 24, 2026</span>
+            </div>
+
+            <div>
+              <h2 class="text-lg sm:text-xl font-bold text-white leading-snug">
+                The Respiratory Threat Landscape in Africa
+              </h2>
+              <p class="text-xs sm:text-sm text-cyan-200/90 mt-1 font-medium">
+                Influenza, RSV and COVID-19 burden, economic impact and policy implications
+              </p>
+            </div>
+
+            <!-- Speaker Card -->
+            <div class="rounded-xl bg-slate-900/75 border border-slate-700/70 p-3.5 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-white">Awuor Nancy Otieno</span>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Keynote Speaker</span>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Principal Research Scientist, <span class="text-white font-medium">Kenya Medical Research Institute (KEMRI)</span>, Centre for Global Health Research
+              </p>
+              <p class="text-xs text-cyan-300/90 font-medium">
+                Executive Chair, African Network for Influenza Surveillance and Epidemiology (ANISE)
+              </p>
+              <div class="pt-1.5 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                <span>Addis Ababa, Ethiopia</span>
+                <span>Nov 24, 2026</span>
+              </div>
+            </div>
+
+            <!-- 3 Pathogens Interactive Cards -->
+            <div class="space-y-2">
+              <div class="text-[11px] font-mono uppercase tracking-wider text-slate-400">Primary Viral Threats Visualized in 3D</div>
+              <div class="grid grid-cols-3 gap-2">
+                <button onclick="focusViralNode('rsv')" class="rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 p-2.5 text-left transition cursor-pointer">
+                  <div class="w-2.5 h-2.5 rounded-full bg-rose-400 mb-1.5"></div>
+                  <div class="text-xs font-bold text-white">RSV</div>
+                  <div class="text-[10px] text-rose-200/80 leading-tight mt-0.5">~60% pediatric deaths in SSA</div>
+                </button>
+                <button onclick="focusViralNode('covid')" class="rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 p-2.5 text-left transition cursor-pointer">
+                  <div class="w-2.5 h-2.5 rounded-full bg-cyan-400 mb-1.5"></div>
+                  <div class="text-xs font-bold text-white">COVID-19</div>
+                  <div class="text-[10px] text-cyan-200/80 leading-tight mt-0.5">704.8M+ cases; hidden burden</div>
+                </button>
+                <button onclick="focusViralNode('flu')" class="rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 p-2.5 text-left transition cursor-pointer">
+                  <div class="w-2.5 h-2.5 rounded-full bg-amber-400 mb-1.5"></div>
+                  <div class="text-xs font-bold text-white">Influenza</div>
+                  <div class="text-[10px] text-amber-200/80 leading-tight mt-0.5">Seasonal & zoonotic risk</div>
+                </button>
+              </div>
+            </div>
+
+            <div class="pt-1 flex items-center justify-between gap-2">
+              <button onclick="switchModule(1)" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/25 transition cursor-pointer flex items-center justify-center gap-2">
+                <span>Explore 3D Presentation Modules</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              </button>
+            </div>
+          </div>
+        `
+      },
+      {
+        id: 1,
+        tag: "Module 02 • Epidemiological Comparison",
+        title: "Key Global Metrics: RSV vs. COVID-19",
+        subtitle: "Disproportionate pediatric RSV mortality in Sub-Saharan Africa",
+        accent: "rose",
+        cameraPos: [0.5, 4.5, 13.5],
+        lookAt: [-1.5, 1.5, 0],
+        renderHTML: () => `
+          <div class="space-y-3.5">
+            <div>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-rose-400">Slide 02 • Key Global Metrics</span>
+              <h2 class="text-lg font-bold text-white mt-0.5">RSV vs. COVID-19 Burden</h2>
+              <p class="text-xs text-slate-300 mt-1">Click any 3D tower in the scene to inspect global incidence, hospitalizations, and mortality rates.</p>
+            </div>
+
+            <!-- Highlighted Alert Box from Slide 2 (Red Circle Emphasis) -->
+            <div class="rounded-xl bg-gradient-to-r from-rose-500/20 to-amber-500/15 border border-rose-500/50 p-3">
+              <div class="flex items-start gap-2.5">
+                <div class="w-6 h-6 rounded-lg bg-rose-500/30 text-rose-300 flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs">!</div>
+                <div>
+                  <div class="text-xs font-bold text-rose-200">Critical Geographic Disparity (RSV)</div>
+                  <p class="text-xs text-white/95 mt-0.5 leading-relaxed">
+                    <span class="font-bold text-rose-300">97% of pediatric deaths</span> occur in LMICs; <span class="font-bold text-amber-300 underline decoration-rose-400">~60% occur in Sub-Saharan Africa</span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Comparative Data Breakdown -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <!-- RSV Column -->
+              <div class="rounded-xl bg-slate-900/75 border border-rose-500/30 p-3 space-y-2">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                  <span class="text-xs font-bold text-rose-300">RSV (Annual)</span>
+                  <span class="text-[10px] font-mono bg-rose-500/20 text-rose-200 px-1.5 py-0.5 rounded">35.78% Attack</span>
+                </div>
+                <ul class="text-[11px] text-slate-300 space-y-1.5 leading-snug">
+                  <li><strong class="text-white">Acute LRI:</strong> ~33.0 million cases</li>
+                  <li><strong class="text-white">Hospitalizations:</strong> ~3.6M globally (160k ≥65 yrs U.S.)</li>
+                  <li><strong class="text-white">Mortality:</strong> ~100,000 deaths (~26,300 in-hospital; ~50% in &lt;6 months; 10,000 in ≥65 yrs)</li>
+                  <li><strong class="text-rose-300">Attack Rate:</strong> Pooled 35.78% (higher in neonatal/pediatric wards)</li>
+                </ul>
+              </div>
+
+              <!-- COVID-19 Column -->
+              <div class="rounded-xl bg-slate-900/75 border border-cyan-500/30 p-3 space-y-2">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                  <span class="text-xs font-bold text-cyan-300">COVID-19</span>
+                  <span class="text-[10px] font-mono bg-cyan-500/20 text-cyan-200 px-1.5 py-0.5 rounded">4% Attack</span>
+                </div>
+                <ul class="text-[11px] text-slate-300 space-y-1.5 leading-snug">
+                  <li><strong class="text-white">Confirmed Cases:</strong> ~704.8 million+ cumulative</li>
+                  <li><strong class="text-white">Excess Mortality:</strong> ~18 million deaths globally</li>
+                  <li><strong class="text-white">Peak Rank:</strong> #1 in 2021 (~16,500 daily deaths Jan 2021), dropping to #20 by 2023</li>
+                  <li><strong class="text-cyan-300">Age Skew:</strong> Older adults 82% of reported deaths</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="text-[10px] text-slate-400 leading-tight border-t border-slate-800 pt-2">
+              Sources: Duan Q, et al. <em>eClinicalMedicine</em> (1960–2025); WHO COVID-19 Dashboards; Trop Med Infect Dis 2025.
+            </div>
+          </div>
+        `
+      },
+      {
+        id: 2,
+        tag: "Module 03 • Surveillance Discrepancy",
+        title: "The Missing Millions (2020–2022)",
+        subtitle: "Uncovering the Burden of COVID-19 Cases and Deaths in Africa",
+        accent: "coral",
+        cameraPos: [0, 5.2, 13.5],
+        lookAt: [-1.5, 1.8, 0],
+        renderHTML: () => `
+          <div class="space-y-3.5">
+            <div>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-rose-400">Slide 03 • Epidemiological Curve</span>
+              <h2 class="text-lg font-bold text-white mt-0.5">The Missing Millions in Africa</h2>
+              <p class="text-xs text-slate-300 mt-1">
+                Reported new COVID-19 cases per million (Jan 2020 – Jul 2022) show an artificially flat red line for Africa compared to massive Omicron peaks in Europe & Asia (~2,400/million).
+              </p>
+            </div>
+
+            <!-- Interactive Toggle for Surveillance Gap -->
+            <div class="rounded-xl bg-slate-900/80 border border-cyan-500/30 p-3 flex items-center justify-between gap-3">
+              <div>
+                <div class="text-xs font-bold text-white">Reveal Estimated Surveillance Gap</div>
+                <div class="text-[11px] text-slate-400">Project underreported true community transmission</div>
+              </div>
+              <button onclick="toggleSurveillanceGapModel()" id="btn-gap-toggle" class="px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${showSurveillanceGap ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'bg-slate-800 text-cyan-300 border border-cyan-500/40'}">
+                ${showSurveillanceGap ? 'Gap Visible' : 'Show Gap'}
+              </button>
+            </div>
+
+            <!-- Key Insights Callout Box from Slide 3 -->
+            <div class="space-y-2">
+              <div class="rounded-xl bg-rose-500/15 border border-rose-500/35 p-3">
+                <div class="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                  Surveillance Limitations = Substantial Underreporting
+                </div>
+                <p class="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                  Limited diagnostic testing capacity and passive reporting masked millions of infections across the African region.
+                </p>
+              </div>
+
+              <div class="rounded-xl bg-amber-500/15 border border-amber-500/35 p-3">
+                <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                  Concentrated Severe Outcomes
+                </div>
+                <p class="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                  Severe outcomes and excess mortality remained heavily concentrated among vulnerable and unimmunized populations.
+                </p>
+              </div>
+            </div>
+
+            <!-- Region Legend -->
+            <div class="grid grid-cols-3 gap-1.5 pt-1 text-[11px] font-mono">
+              <div class="flex items-center gap-1.5 text-rose-400 font-bold"><span class="w-3 h-1 bg-rose-500 inline-block"></span>Africa</div>
+              <div class="flex items-center gap-1.5 text-sky-300"><span class="w-3 h-1 bg-sky-400 inline-block"></span>Asia</div>
+              <div class="flex items-center gap-1.5 text-indigo-300"><span class="w-3 h-1 bg-indigo-400 inline-block"></span>Europe</div>
+              <div class="flex items-center gap-1.5 text-emerald-300"><span class="w-3 h-1 bg-emerald-400 inline-block"></span>N. America</div>
+              <div class="flex items-center gap-1.5 text-amber-300"><span class="w-3 h-1 bg-amber-400 inline-block"></span>Oceania</div>
+              <div class="flex items-center gap-1.5 text-purple-300"><span class="w-3 h-1 bg-purple-400 inline-block"></span>S. America</div>
+            </div>
+
+            <div class="text-[10px] text-slate-400 border-t border-slate-800 pt-2">
+              Source: <em>Population & Development Review</em>, Vol. 50, Issue 1, pp. 7–58 (March 2024).
+            </div>
+          </div>
+        `
+      },
+      {
+        id: 3,
+        tag: "Module 04 • Macroeconomic Impact",
+        title: "Economic Impact Iceberg (10% vs. 90%)",
+        subtitle: "Figure 4: Impression of the economic burden of viral respiratory disease",
+        accent: "emerald",
+        cameraPos: [0, 1.2, 13.5],
+        lookAt: [-1.5, -1.2, 0],
+        renderHTML: () => `
+          <div class="space-y-3.5">
+            <div>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-emerald-400">Slide 04 • Economic Burden</span>
+              <h2 class="text-lg font-bold text-white mt-0.5">The 10% / 90% Economic Iceberg</h2>
+              <p class="text-xs text-slate-300 mt-1">
+                Direct clinical expenses represent only the visible tip (10%), while 90% of the economic shock lies submerged beneath the surface.
+              </p>
+            </div>
+
+            <!-- Interactive Submerge Camera Control -->
+            <div class="rounded-xl bg-slate-900/80 border border-cyan-500/30 p-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-cyan-300">Camera Depth Explorer</span>
+                <button onclick="toggleIcebergDive()" class="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-[11px] font-semibold cursor-pointer">
+                  ${icebergSubmergedView ? 'Surface (10% View)' : 'Dive Underwater (90%)'}
+                </button>
+              </div>
+              <input type="range" min="0" max="100" value="${Math.round(icebergDepthRatio * 100)}" oninput="setIcebergDepth(this.value)" class="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+            </div>
+
+            <!-- 10% Above Water -->
+            <div class="rounded-xl bg-sky-500/15 border border-sky-400/40 p-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-bold text-sky-300">10% Visible Tip — Direct Medical Costs</span>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/25 text-sky-200">Above Surface</span>
+              </div>
+              <ul class="text-xs text-slate-200 space-y-1 list-disc list-inside">
+                <li>Frequent outpatient visit costs & over-the-counter medications</li>
+                <li>High hospitalization costs</li>
+              </ul>
+            </div>
+
+            <!-- 90% Below Water -->
+            <div class="rounded-xl bg-emerald-500/15 border border-emerald-400/40 p-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-bold text-emerald-300">90% Submerged — Indirect & Macro Losses</span>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/25 text-emerald-200">Deep Burden</span>
+              </div>
+              <ul class="text-[11px] text-slate-200 space-y-1 list-disc list-inside leading-relaxed">
+                <li>Lost household income during caregiving periods</li>
+                <li>Increased demand on pediatric, geriatric & intensive care services</li>
+                <li>Major GDP losses across African economies</li>
+                <li>Increased unemployment and poverty</li>
+                <li>Reduced education and workforce productivity</li>
+                <li>Increased government spending on emergency response & vaccination efforts</li>
+              </ul>
+            </div>
+          </div>
+        `
+      },
+      {
+        id: 4,
+        tag: "Module 05 • Structural & Clinical Risks",
+        title: "Burden Drivers & High-Risk Populations",
+        subtitle: "Systemic accelerators and vulnerable cohorts across Africa",
+        accent: "amber",
+        cameraPos: [0, 4.2, 13.8],
+        lookAt: [-1.5, 0.5, 0],
+        renderHTML: () => `
+          <div class="space-y-3.5">
+            <div>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-amber-400">Slides 05 & 06 • Determinants & Risk</span>
+              <h2 class="text-lg font-bold text-white mt-0.5">Burden Factors & Vulnerable Groups</h2>
+              <p class="text-xs text-slate-300 mt-1">Click the outer orbital nodes (5 Drivers) or inner bio-shield nodes (High-Risk Groups) in 3D.</p>
+            </div>
+
+            <!-- 5 Burden Factors -->
+            <div class="space-y-1.5">
+              <div class="text-[11px] font-mono uppercase tracking-wider text-cyan-300">5 Factors Influencing Burden in Africa</div>
+              <div class="space-y-1.5 text-[11px]">
+                <div class="rounded-lg bg-slate-900/75 border border-slate-700/80 p-2.5">
+                  <strong class="text-white">1. Population growth:</strong> <span class="text-slate-300">Overcrowding accelerating transmission</span>
+                </div>
+                <div class="rounded-lg bg-slate-900/75 border border-slate-700/80 p-2.5">
+                  <strong class="text-white">2. Lifestyle factors:</strong> <span class="text-slate-300">Housing conditions (crowding, indoor air pollution from solid fuels), nutrition, and access to clean water</span>
+                </div>
+                <div class="rounded-lg bg-slate-900/75 border border-slate-700/80 p-2.5">
+                  <strong class="text-white">3. Limited treatment resources:</strong> <span class="text-slate-300">No antivirals, costly antibiotics (for bacterial co-infections), and limited diagnostics</span>
+                </div>
+                <div class="rounded-lg bg-slate-900/75 border border-slate-700/80 p-2.5">
+                  <strong class="text-white">4. Low vaccination rates:</strong> <span class="text-slate-300">Absence of national immunization programs, vaccine hesitancy</span>
+                </div>
+                <div class="rounded-lg bg-slate-900/75 border border-slate-700/80 p-2.5">
+                  <strong class="text-white">5. Age-related inequalities:</strong> <span class="text-slate-300">Vulnerability of children &lt;5 and adults over 65</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- High-Risk Populations -->
+            <div class="rounded-xl bg-rose-500/15 border border-rose-500/35 p-3 space-y-1.5">
+              <div class="text-xs font-bold text-rose-300">High-Risk Populations (Severe Impacts)</div>
+              <ul class="text-[11px] text-slate-200 space-y-1 list-disc list-inside">
+                <li><strong class="text-white">Children under two:</strong> Severe RSV and bronchiolitis</li>
+                <li><strong class="text-white">Adults over 65:</strong> High hospitalization & mortality</li>
+                <li><strong class="text-white">Immunocompromised individuals</strong></li>
+                <li><strong class="text-white">Chronic respiratory patients:</strong> Asthma or COPD</li>
+              </ul>
+            </div>
+          </div>
+        `
+      },
+      {
+        id: 5,
+        tag: "Module 06 • Actionable Roadmap",
+        title: "Policy Implications & Strategic Pillars",
+        subtitle: "Building resilient surveillance, immunization, and regional manufacturing",
+        accent: "emerald",
+        cameraPos: [0, 3.8, 13.5],
+        lookAt: [-1.5, 1.2, 0],
+        renderHTML: () => `
+          <div class="space-y-3.5">
+            <div>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-emerald-400">Slide 07 • Policy Framework</span>
+              <h2 class="text-lg font-bold text-white mt-0.5">Strategic Policy Implications</h2>
+              <p class="text-xs text-slate-300 mt-1">Three foundational pillars required to mitigate respiratory threats across Africa.</p>
+            </div>
+
+            <!-- Pillar 1 -->
+            <div class="rounded-xl bg-emerald-500/15 border border-emerald-500/40 p-3 space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded bg-emerald-500/30 text-emerald-200 font-mono text-[10px] font-bold">PILLAR 01</span>
+                <h3 class="text-xs font-bold text-white">Ongoing Global Tracking & Surveillance</h3>
+              </div>
+              <ul class="text-[11px] text-slate-200 space-y-1 list-disc list-inside pl-1">
+                <li>Strengthening integrated respiratory virus surveillance systems</li>
+                <li>Expanding laboratory diagnostic capacity</li>
+              </ul>
+            </div>
+
+            <!-- Pillar 2 -->
+            <div class="rounded-xl bg-cyan-500/15 border border-cyan-500/40 p-3 space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded bg-cyan-500/30 text-cyan-200 font-mono text-[10px] font-bold">PILLAR 02</span>
+                <h3 class="text-xs font-bold text-white">Vaccination Programs & Antivirals</h3>
+              </div>
+              <ul class="text-[11px] text-slate-200 space-y-1 list-disc list-inside pl-1">
+                <li>Increasing uptake of seasonal influenza vaccination among high-risk groups</li>
+                <li>Introducing new RSV prevention tools: <span class="text-cyan-200 font-medium">maternal RSV vaccines</span> and <span class="text-cyan-200 font-medium">long-acting monoclonal antibodies</span></li>
+                <li>Maintaining COVID-19 vaccination programs for vulnerable populations</li>
+              </ul>
+            </div>
+
+            <!-- Pillar 3 -->
+            <div class="rounded-xl bg-amber-500/15 border border-amber-500/40 p-3 space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded bg-amber-500/30 text-amber-200 font-mono text-[10px] font-bold">PILLAR 03</span>
+                <h3 class="text-xs font-bold text-white">Readiness for Emerging Zoonotic Threats</h3>
+              </div>
+              <ul class="text-[11px] text-slate-200 space-y-1 list-disc list-inside pl-1">
+                <li>Investing in pandemic preparedness</li>
+                <li>Building regional vaccine manufacturing capacity</li>
+              </ul>
+            </div>
+
+            <div class="pt-1">
+              <button onclick="switchModule(0)" class="w-full py-2 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-xs font-semibold text-cyan-300 transition cursor-pointer">
+                ↺ Return to Keynote Overview
+              </button>
+            </div>
+          </div>
+        `
+      }
+    ];
+
+    // --- INITIALIZATION ---
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        initThreeEngine();
+        buildAllScenes();
+        switchModule(0);
+        animateLoop();
+      } catch (err) {
+        console.error("Initialization Error:", err);
+        showFallbackBanner("WebGL initialization encountered an issue. Please ensure hardware acceleration is enabled.");
+      }
+    });
+
+    function showFallbackBanner(msg) {
+      const div = document.createElement('div');
+      div.className = "fixed top-20 left-1/2 -translate-x-1/2 z-50 glass-panel px-4 py-3 rounded-xl text-xs text-rose-300 border-rose-500";
+      div.textContent = msg;
+      document.body.appendChild(div);
+    }
+
+    function initThreeEngine() {
+      const container = document.getElementById('canvas-container');
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x050a12, 0.024);
+
+      camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 200);
+      camera.position.set(0, 3.2, 12.5);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+      container.appendChild(renderer.domElement);
+
+      // OrbitControls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.maxDistance = 28;
+      controls.minDistance = 4.5;
+      controls.maxPolarAngle = Math.PI * 0.88;
+      controls.target.set(-1.8, 0.3, 0);
+
+      // Cancel auto-transition if user manually grabs controls
+      controls.addEventListener('start', () => {
+        isTransitioningCamera = false;
+      });
+
+      // Lighting Setup
+      const ambientLight = new THREE.AmbientLight(0x38bdf8, 0.55);
+      scene.add(ambientLight);
+
+      const dirLight1 = new THREE.DirectionalLight(0x22d3ee, 1.35);
+      dirLight1.position.set(10, 15, 12);
+      scene.add(dirLight1);
+
+      const dirLight2 = new THREE.DirectionalLight(0xf43f5e, 0.75);
+      dirLight2.position.set(-12, 8, -10);
+      scene.add(dirLight2);
+
+      const bottomLight = new THREE.PointLight(0x10b981, 1.2, 30);
+      bottomLight.position.set(2, -8, 4);
+      scene.add(bottomLight);
+
+      // Raycaster for 3D Hover & Click
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2(-999, -999);
+
+      // Ambient Starfield / Bio-particle Dust
+      createAmbientParticles();
+
+      // Event Listeners
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('click', onCanvasClick);
+    }
+
+    function createAmbientParticles() {
+      const count = 900;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+
+      const c1 = new THREE.Color(0x22d3ee);
+      const c2 = new THREE.Color(0x10b981);
+      const c3 = new THREE.Color(0xf43f5e);
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 45;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 35;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 45;
+
+        const pick = Math.random();
+        const col = pick < 0.55 ? c1 : (pick < 0.85 ? c2 : c3);
+        colors[i * 3] = col.r;
+        colors[i * 3 + 1] = col.g;
+        colors[i * 3 + 2] = col.b;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 0.11,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.65,
+        blending: THREE.AdditiveBlending
+      });
+
+      starfieldMesh = new THREE.Points(geometry, material);
+      scene.add(starfieldMesh);
+    }
+
+    // --- HELPER: CREATE 3D SPRITE LABEL ---
+    function createTextSprite(text, subtext = "", colorHex = "#22d3ee") {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 160;
+      const ctx = canvas.getContext('2d');
+
+      // Pill background
+      ctx.fillStyle = "rgba(6, 14, 26, 0.82)";
+      ctx.strokeStyle = colorHex;
+      ctx.lineWidth = 4;
+      roundRect(ctx, 16, 16, 480, 128, 28);
+      ctx.fill();
+      ctx.stroke();
+
+      // Title
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 34px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(text, 256, subtext ? 72 : 92);
+
+      // Subtext
+      if (subtext) {
+        ctx.fillStyle = colorHex;
+        ctx.font = "600 24px JetBrains Mono, monospace";
+        ctx.fillText(subtext, 256, 114);
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(3.2, 1.0, 1);
+      return sprite;
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    // --- HELPER: BUILD STYLISED VIRION MESH ---
+    function createVirionMesh(radius, colorHex, spikeCount = 24) {
+      const group = new THREE.Group();
+      const coreGeo = new THREE.IcosahedronGeometry(radius, 2);
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 0.35,
+        roughness: 0.3,
+        metalness: 0.2,
+        wireframe: false
+      });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      group.add(core);
+
+      // Wireframe shell
+      const wireGeo = new THREE.IcosahedronGeometry(radius * 1.06, 1);
+      const wireMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.22
+      });
+      group.add(new THREE.Mesh(wireGeo, wireMat));
+
+      // Surface Glycoprotein Spikes
+      const spikeGeo = new THREE.CylinderGeometry(radius * 0.04, radius * 0.08, radius * 0.42, 6);
+      const tipGeo = new THREE.SphereGeometry(radius * 0.11, 8, 8);
+      const spikeMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: colorHex,
+        emissiveIntensity: 0.6
+      });
+
+      const phi = Math.PI * (3 - Math.sqrt(5));
+      for (let i = 0; i < spikeCount; i++) {
+        const y = 1 - (i / (spikeCount - 1)) * 2;
+        const r = Math.sqrt(1 - y * y);
+        const theta = phi * i;
+        const dir = new THREE.Vector3(Math.cos(theta) * r, y, Math.sin(theta) * r).normalize();
+
+        const spike = new THREE.Mesh(spikeGeo, spikeMat);
+        spike.position.copy(dir).multiplyScalar(radius * 1.15);
+        spike.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+        group.add(spike);
+
+        const tip = new THREE.Mesh(tipGeo, spikeMat);
+        tip.position.copy(dir).multiplyScalar(radius * 1.38);
+        group.add(tip);
+      }
+      return group;
+    }
+
+    // --- BUILD ALL 6 3D MODULE SCENES ---
+    function buildAllScenes() {
+      // Shift 3D center slightly to the right (+1.8 on X) on desktop so left HUD panel never obscures it
+      const offsetX = window.innerWidth >= 640 ? 2.1 : 0;
+
+      moduleGroups = [
+        buildModule0_Overview(offsetX),
+        buildModule1_GlobalMetrics(offsetX),
+        buildModule2_MissingMillions(offsetX),
+        buildModule3_EconomicIceberg(offsetX),
+        buildModule4_DriversAndRisk(offsetX),
+        buildModule5_PolicyPillars(offsetX)
+      ];
+
+      moduleGroups.forEach((grp, idx) => {
+        grp.visible = (idx === 0);
+        scene.add(grp);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 0: OVERVIEW — 3D AFRICA BIO-SURVEILLANCE GLOBE & VIRAL TRIO
+    // -------------------------------------------------------------------------
+    function buildModule0_Overview(offsetX) {
+      const group = new THREE.Group();
+      group.position.x = offsetX;
+
+      // Holographic Surveillance Globe
+      const globeRadius = 2.45;
+      const globeGeo = new THREE.SphereGeometry(globeRadius, 32, 32);
+      const globeMat = new THREE.MeshStandardMaterial({
+        color: 0x091e32,
+        emissive: 0x062038,
+        roughness: 0.4,
+        metalness: 0.6,
+        transparent: true,
+        opacity: 0.88
+      });
+      const globe = new THREE.Mesh(globeGeo, globeMat);
+      group.add(globe);
+
+      // Latitude/Longitude Grid Cage
+      const wireGlobe = new THREE.Mesh(
+        new THREE.SphereGeometry(globeRadius * 1.015, 24, 18),
+        new THREE.MeshBasicMaterial({ color: 0x22d3ee, wireframe: true, transparent: true, opacity: 0.16 })
+      );
+      group.add(wireGlobe);
+
+      // Stylized Africa Continent Surveillance Cluster (Glowing Emerald/Cyan Nodes on Front Hemisphere)
+      const africaCoords = [
+        [0.15, 0.72], [-0.15, 0.68], [-0.35, 0.52], [-0.48, 0.28], [-0.22, 0.25],
+        [0.05, 0.35], [0.35, 0.42], [0.55, 0.25], [0.45, 0.02], [0.28, -0.18],
+        [0.32, -0.45], [0.18, -0.72], [0.05, -0.82], [-0.02, -0.52], [0.08, -0.22],
+        [0.42, 0.12] // Addis Ababa / East Africa hub
+      ];
+
+      const nodeGeo = new THREE.SphereGeometry(0.085, 12, 12);
+      const nodeMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+      const hubMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+
+      const nodePositions = [];
+      africaCoords.forEach(([lon, lat], i) => {
+        const phi = (90 - lat * 55) * (Math.PI / 180);
+        const theta = (lon * 65 + 90) * (Math.PI / 180);
+        const pos = new THREE.Vector3(
+          -globeRadius * 1.03 * Math.sin(phi) * Math.cos(theta),
+          globeRadius * 1.03 * Math.cos(phi),
+          globeRadius * 1.03 * Math.sin(phi) * Math.sin(theta)
+        );
+        nodePositions.push(pos);
+
+        const isAddisHub = (i === africaCoords.length - 1);
+        const dot = new THREE.Mesh(nodeGeo, isAddisHub ? hubMat : nodeMat);
+        dot.position.copy(pos);
+        if (isAddisHub) {
+          dot.scale.setScalar(1.65);
+          dot.userData = {
+            module: 0,
+            badge: "CPHIA 2026 Host Hub",
+            title: "Addis Ababa, Ethiopia",
+            desc: "ANISE & KEMRI Respiratory Surveillance Network Presentation (Nov 24, 2026)"
+          };
+          interactiveObjects.push(dot);
+        }
+        group.add(dot);
+      });
+
+      // Connecting Surveillance Arcs across Africa Nodes
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.45 });
+      for (let i = 0; i < nodePositions.length - 1; i++) {
+        const pts = [nodePositions[i], nodePositions[i + 1]];
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        group.add(new THREE.Line(lineGeo, lineMat));
+      }
+
+      // 3 Orbiting Viral Pathogens (RSV, COVID-19, Influenza)
+      const viralSpecs = [
+        {
+          id: 'rsv',
+          name: 'RSV Virion',
+          badge: 'Primary Pediatric Threat',
+          desc: '~33M Acute LRI cases/yr; ~60% of global pediatric RSV deaths occur in Sub-Saharan Africa.',
+          color: 0xf43f5e,
+          pos: [-3.4, 1.5, 1.4],
+          scale: 0.62
+        },
+        {
+          id: 'covid',
+          name: 'SARS-CoV-2 (COVID-19)',
+          badge: 'Pandemic & Endemic Burden',
+          desc: '704.8M+ confirmed cases; ~18M excess deaths; substantial underreporting across Africa.',
+          color: 0x22d3ee,
+          pos: [3.5, 1.2, 1.2],
+          scale: 0.65
+        },
+        {
+          id: 'flu',
+          name: 'Influenza Virus',
+          badge: 'Seasonal & Zoonotic Threat',
+          desc: 'Tracked by ANISE across Africa; requires high-risk seasonal vaccination & pandemic readiness.',
+          color: 0xf59e0b,
+          pos: [0.2, -2.9, 1.9],
+          scale: 0.56
+        }
+      ];
+
+      const virionMeshes = [];
+      viralSpecs.forEach((v) => {
+        const vMesh = createVirionMesh(v.scale, v.color, 20);
+        vMesh.position.set(...v.pos);
+        // Invisible hit sphere for easy clicking/hovering
+        const hitMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(v.scale * 1.6, 12, 12),
+          new THREE.MeshBasicMaterial({ visible: false })
+        );
+        hitMesh.userData = {
+          module: 0,
+          viralId: v.id,
+          badge: v.badge,
+          title: v.name,
+          desc: v.desc
+        };
+        vMesh.add(hitMesh);
+        interactiveObjects.push(hitMesh);
+
+        const lbl = createTextSprite(v.name.split(' ')[0], "Click to inspect", `#${v.color.toString(16).padStart(6, '0')}`);
+        lbl.position.set(v.pos[0], v.pos[1] - 1.15, v.pos[2]);
+        lbl.scale.set(2.3, 0.72, 1);
+        group.add(lbl);
+
+        group.add(vMesh);
+        virionMeshes.push({ mesh: vMesh, basePos: new THREE.Vector3(...v.pos) });
+      });
+
+      animatedMixers.push((t) => {
+        if (!group.visible) return;
+        wireGlobe.rotation.y = t * 0.12;
+        virionMeshes.forEach((item, idx) => {
+          item.mesh.rotation.y = t * (0.4 + idx * 0.15);
+          item.mesh.rotation.x = Math.sin(t * 0.7 + idx) * 0.25;
+          item.mesh.position.y = item.basePos.y + Math.sin(t * 1.4 + idx * 2.1) * 0.18;
+        });
+      });
+
+      return group;
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 1: KEY GLOBAL METRICS — 3D COMPARATIVE TOWERS & SSA RING
+    // -------------------------------------------------------------------------
+    function buildModule1_GlobalMetrics(offsetX) {
+      const group = new THREE.Group();
+      group.position.x = offsetX;
+
+      // Base Platform Grid
+      const grid = new THREE.GridHelper(12, 16, 0x22d3ee, 0x0f2942);
+      grid.position.y = -1.5;
+      group.add(grid);
+
+      // Comparative 3D Pillars (Normalized visual heights with exact data tooltips)
+      const bars = [
+        {
+          label: "RSV Acute LRI",
+          valText: "~33.0M / yr",
+          height: 3.8,
+          x: -3.4,
+          z: -0.6,
+          color: 0xf43f5e,
+          badge: "RSV Global Incidence",
+          desc: "~33.0 million Acute Lower Respiratory Infection (LRI) cases annually."
+        },
+        {
+          label: "RSV Hospitalizations",
+          valText: "~3.6M / yr",
+          height: 2.3,
+          x: -1.6,
+          z: -0.6,
+          color: 0xfb7185,
+          badge: "RSV Severe Care",
+          desc: "~3.6 million global hospitalizations/yr (includes 160,000 older adults ≥65 yrs in U.S.)."
+        },
+        {
+          label: "RSV Mortality",
+          valText: "~100k Deaths",
+          height: 1.6,
+          x: 0.2,
+          z: -0.6,
+          color: 0xe11d48,
+          badge: "RSV Pediatric Mortality",
+          desc: "~100,000 deaths (~26,300 in-hospital; ~50% in infants <6 months). 97% in LMICs; ~60% in Sub-Saharan Africa."
+        },
+        {
+          label: "COVID-19 Cases",
+          valText: "704.8M+ Total",
+          height: 5.2,
+          x: 2.2,
+          z: -0.6,
+          color: 0x22d3ee,
+          badge: "COVID-19 Cumulative",
+          desc: "~704.8 million+ cumulative confirmed cases globally; 4% pooled attack rate from sentinel surveillance."
+        },
+        {
+          label: "COVID Excess Deaths",
+          valText: "~18M Deaths",
+          height: 3.1,
+          x: 4.0,
+          z: -0.6,
+          color: 0x0284c7,
+          badge: "COVID-19 Mortality",
+          desc: "~18 million estimated excess mortality; #1 global rank in 2021 (~16,500 daily deaths Jan 2021), dropping to #20 by 2023. 82% in older adults."
+        }
+      ];
+
+      bars.forEach((b) => {
+        const geo = new THREE.BoxGeometry(1.1, b.height, 1.1);
+        const mat = new THREE.MeshStandardMaterial({
+          color: b.color,
+          emissive: b.color,
+          emissiveIntensity: 0.28,
+          roughness: 0.25,
+          metalness: 0.3,
+          transparent: true,
+          opacity: 0.9
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(b.x, -1.5 + b.height / 2, b.z);
+        mesh.userData = {
+          module: 1,
+          badge: b.badge,
+          title: `${b.label}: ${b.valText}`,
+          desc: b.desc
+        };
+        interactiveObjects.push(mesh);
+        group.add(mesh);
+
+        // Glowing Cap
+        const cap = new THREE.Mesh(
+          new THREE.BoxGeometry(1.16, 0.08, 1.16),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        cap.position.set(b.x, -1.5 + b.height, b.z);
+        group.add(cap);
+
+        const lbl = createTextSprite(b.label, b.valText, `#${b.color.toString(16).padStart(6, '0')}`);
+        lbl.position.set(b.x, -1.5 + b.height + 0.75, b.z);
+        lbl.scale.set(2.2, 0.68, 1);
+        group.add(lbl);
+      });
+
+      // Highlighted 3D Donut Ring in Foreground: "60% Sub-Saharan Africa Share of Pediatric RSV Deaths"
+      const ringGroup = new THREE.Group();
+      ringGroup.position.set(0.2, 0.3, 2.5);
+
+      // 60% SSA Arc (0.6 * 2PI)
+      const ssaArcGeo = new THREE.TorusGeometry(1.15, 0.22, 16, 48, Math.PI * 2 * 0.60);
+      const ssaArcMat = new THREE.MeshStandardMaterial({
+        color: 0xf43f5e,
+        emissive: 0xf43f5e,
+        emissiveIntensity: 0.5
+      });
+      const ssaArc = new THREE.Mesh(ssaArcGeo, ssaArcMat);
+      ssaArc.userData = {
+        module: 1,
+        badge: "Geography Highlight (Slide 2)",
+        title: "~60% in Sub-Saharan Africa",
+        desc: "97% of pediatric RSV deaths occur in LMICs, with ~60% concentrated in Sub-Saharan Africa."
+      };
+      interactiveObjects.push(ssaArc);
+      ringGroup.add(ssaArc);
+
+      // 37% Other LMICs Arc
+      const lmicArcGeo = new THREE.TorusGeometry(1.15, 0.16, 16, 36, Math.PI * 2 * 0.37);
+      const lmicArcMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        emissive: 0xf59e0b,
+        emissiveIntensity: 0.3
+      });
+      const lmicArc = new THREE.Mesh(lmicArcGeo, lmicArcMat);
+      lmicArc.rotation.z = Math.PI * 2 * 0.605;
+      ringGroup.add(lmicArc);
+
+      const ringLabel = createTextSprite("~60% Sub-Saharan Africa", "97% Pediatric RSV Deaths in LMICs", "#fb7185");
+      ringLabel.position.set(0, -1.55, 0);
+      ringLabel.scale.set(3.4, 1.05, 1);
+      ringGroup.add(ringLabel);
+
+      group.add(ringGroup);
+
+      animatedMixers.push((t) => {
+        if (!group.visible) return;
+        ringGroup.rotation.y = Math.sin(t * 0.8) * 0.35;
+      });
+
+      return group;
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 2: THE MISSING MILLIONS — 3D MULTI-REGION EPIDEMIC CURVES (2020-2022)
+    // -------------------------------------------------------------------------
+    let surveillanceGapMesh = null;
+    let surveillanceGapLabel = null;
+
+    function buildModule2_MissingMillions(offsetX) {
+      const group = new THREE.Group();
+      group.position.x = offsetX;
+
+      // Chart Axis Backdrop
+      const floor = new THREE.GridHelper(11, 14, 0x38bdf8, 0x0f253a);
+      floor.position.y = -1.2;
+      group.add(floor);
+
+      // Y-Axis & X-Axis Frame
+      const axisMat = new THREE.LineBasicMaterial({ color: 0x64748b });
+      const axisPts = [
+        new THREE.Vector3(-4.8, 4.2, -2.5),
+        new THREE.Vector3(-4.8, -1.2, -2.5),
+        new THREE.Vector3(4.8, -1.2, -2.5)
+      ];
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(axisPts), axisMat));
+
+      // Time-series curves matching Slide 3 (Jan 2020 to Jul 2022, peak Jan 2022 ~2400/million)
+      // 11 time checkpoints from Jan 2020 to Jul 2022
+      const regions = [
+        {
+          name: "Asia (Peak ~2,400/M)",
+          color: 0x38bdf8,
+          z: -2.0,
+          values: [0.05, 0.1, 0.25, 0.35, 0.2, 0.3, 0.25, 4.8, 3.1, 2.6, 1.8],
+          desc: "Sharp Omicron wave spike in early 2022 reaching ~2,400 new reported cases per million."
+        },
+        {
+          name: "Europe (Peak ~2,000/M)",
+          color: 0x818cf8,
+          z: -1.2,
+          values: [0.05, 0.2, 0.7, 0.5, 0.6, 0.3, 0.9, 4.0, 2.1, 0.7, 1.1],
+          desc: "Multiple waves culminating in ~2,000 cases per million in Jan 2022."
+        },
+        {
+          name: "North America (Peak ~1,500/M)",
+          color: 0x10b981,
+          z: -0.4,
+          values: [0.02, 0.25, 0.4, 0.9, 0.25, 0.6, 0.45, 3.0, 0.3, 0.4, 0.55],
+          desc: "Winter 2021 and Jan 2022 peaks (~1,500 cases per million)."
+        },
+        {
+          name: "South America",
+          color: 0xc084fc,
+          z: 0.4,
+          values: [0.01, 0.2, 0.45, 0.4, 0.55, 0.5, 0.2, 1.7, 0.25, 0.35, 0.4],
+          desc: "Moderate reported waves peaking around ~850 cases per million in Jan 2022."
+        },
+        {
+          name: "Oceania",
+          color: 0xfbbf24,
+          z: 1.2,
+          values: [0.01, 0.02, 0.03, 0.02, 0.02, 0.05, 0.15, 2.2, 2.9, 2.4, 2.1],
+          desc: "Low baseline until borders opened in 2022 (~1,400 cases per million)."
+        },
+        {
+          name: "Africa (Reported — Flat Red Line)",
+          color: 0xf43f5e,
+          z: 2.2,
+          values: [0.01, 0.03, 0.05, 0.06, 0.03, 0.05, 0.04, 0.09, 0.02, 0.02, 0.02],
+          desc: "Appears nearly flat at 0 due to severe surveillance limitations and substantial underreporting—hiding millions of true cases."
+        }
+      ];
+
+      regions.forEach((reg) => {
+        const points = reg.values.map((val, idx) => {
+          const x = -4.5 + (idx / (reg.values.length - 1)) * 9.0;
+          const y = -1.15 + val;
+          return new THREE.Vector3(x, y, reg.z);
+        });
+
+        const curve = new THREE.CatmullRomCurve3(points);
+        const tubeGeo = new THREE.TubeGeometry(curve, 64, reg.name.includes("Africa") ? 0.09 : 0.06, 8, false);
+        const tubeMat = new THREE.MeshStandardMaterial({
+          color: reg.color,
+          emissive: reg.color,
+          emissiveIntensity: reg.name.includes("Africa") ? 0.65 : 0.35
+        });
+        const tube = new THREE.Mesh(tubeGeo, tubeMat);
+        tube.userData = {
+          module: 2,
+          badge: "2020–2022 Trajectory",
+          title: reg.name,
+          desc: reg.desc
+        };
+        interactiveObjects.push(tube);
+        group.add(tube);
+      });
+
+      // Hidden "Estimated True Burden / Surveillance Gap" Ghost Ribbon above Africa's flat red line
+      const gapValues = [0.05, 0.45, 1.1, 1.4, 0.85, 1.3, 1.15, 3.6, 1.9, 1.4, 1.1];
+      const gapPts = gapValues.map((val, idx) => {
+        const x = -4.5 + (idx / (gapValues.length - 1)) * 9.0;
+        const y = -1.15 + val;
+        return new THREE.Vector3(x, y, 2.2);
+      });
+      const gapCurve = new THREE.CatmullRomCurve3(gapPts);
+      const gapGeo = new THREE.TubeGeometry(gapCurve, 64, 0.075, 8, false);
+      const gapMat = new THREE.MeshBasicMaterial({
+        color: 0xfda4af,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.85
+      });
+      surveillanceGapMesh = new THREE.Mesh(gapGeo, gapMat);
+      surveillanceGapMesh.visible = false;
+      group.add(surveillanceGapMesh);
+
+      surveillanceGapLabel = createTextSprite("Unreported Burden Gap", "Surveillance Limitations", "#fda4af");
+      surveillanceGapLabel.position.set(1.8, 2.8, 2.2);
+      surveillanceGapLabel.scale.set(3.2, 0.95, 1);
+      surveillanceGapLabel.visible = false;
+      group.add(surveillanceGapLabel);
+
+      // Date Markers along X-Axis
+      const dates = [
+        { label: "Jan 2020", x: -4.5 },
+        { label: "Jan 2021", x: -0.9 },
+        { label: "Jan 2022 (Peak)", x: 1.8 },
+        { label: "Jul 2022", x: 4.5 }
+      ];
+      dates.forEach((d) => {
+        const lbl = createTextSprite(d.label, "", "#94a3b8");
+        lbl.position.set(d.x, -1.65, 2.2);
+        lbl.scale.set(1.8, 0.55, 1);
+        group.add(lbl);
+      });
+
+      return group;
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 3: ECONOMIC IMPACT ICEBERG (10% ABOVE / 90% BELOW WATER)
+    // -------------------------------------------------------------------------
+    function buildModule3_EconomicIceberg(offsetX) {
+      const group = new THREE.Group();
+      group.position.x = offsetX;
+
+      // Water Surface Plane at Y = 0
+      const waterGeo = new THREE.PlaneGeometry(14, 14, 32, 32);
+      waterGeo.rotateX(-Math.PI / 2);
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        emissive: 0x0369a1,
+        emissiveIntensity: 0.35,
+        roughness: 0.15,
+        metalness: 0.7,
+        transparent: true,
+        opacity: 0.52,
+        side: THREE.DoubleSide
+      });
+      const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+      group.add(waterMesh);
+
+      // Glowing Waterline Ring
+      const waterRing = new THREE.Mesh(
+        new THREE.RingGeometry(2.2, 2.32, 48),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
+      );
+      waterRing.rotation.x = -Math.PI / 2;
+      waterRing.position.y = 0.02;
+      group.add(waterRing);
+
+      // 10% Visible Tip (Above Y = 0)
+      const tipGeo = new THREE.ConeGeometry(1.75, 2.1, 7);
+      const tipMat = new THREE.MeshStandardMaterial({
+        color: 0xe0f2fe,
+        emissive: 0x38bdf8,
+        emissiveIntensity: 0.25,
+        roughness: 0.2,
+        flatShading: true
+      });
+      const tipMesh = new THREE.Mesh(tipGeo, tipMat);
+      tipMesh.position.y = 1.05;
+      tipMesh.userData = {
+        module: 3,
+        badge: "10% Visible Tip (Above Surface)",
+        title: "Direct Medical Costs (10%)",
+        desc: "Frequent outpatient visit costs, over-the-counter medications, and high hospitalization costs."
+      };
+      interactiveObjects.push(tipMesh);
+      group.add(tipMesh);
+
+      const tipLabel = createTextSprite("10% Direct Medical Costs", "Outpatient, OTC & Hospitalization", "#38bdf8");
+      tipLabel.position.set(2.9, 1.3, 0);
+      tipLabel.scale.set(3.2, 0.95, 1);
+      group.add(tipLabel);
+
+      // 90% Submerged Massive Iceberg Base (Below Y = 0)
+      const baseGeo = new THREE.CylinderGeometry(1.85, 0.35, 5.2, 9, 4);
+      // Perturb vertices for organic crystalline iceberg look
+      const posAttr = baseGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const y = posAttr.getY(i);
+        if (y < 2.4 && y > -2.4) {
+          posAttr.setX(i, posAttr.getX(i) * (0.85 + Math.sin(i * 1.7) * 0.28));
+          posAttr.setZ(i, posAttr.getZ(i) * (0.85 + Math.cos(i * 2.3) * 0.28));
+        }
+      }
+      baseGeo.computeVertexNormals();
+
+      const baseMat = new THREE.MeshStandardMaterial({
+        color: 0x10b981,
+        emissive: 0x059669,
+        emissiveIntensity: 0.35,
+        roughness: 0.3,
+        transparent: true,
+        opacity: 0.88,
+        flatShading: true
+      });
+      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+      baseMesh.position.y = -2.65;
+      baseMesh.userData = {
+        module: 3,
+        badge: "90% Submerged Burden",
+        title: "Hidden Macroeconomic & Societal Losses (90%)",
+        desc: "Lost household income, pediatric/geriatric ICU strain, major GDP losses, unemployment, reduced education/workforce productivity, and emergency spending."
+      };
+      interactiveObjects.push(baseMesh);
+      group.add(baseMesh);
+
+      const baseLabel = createTextSprite("90% Hidden Economic Burden", "GDP Loss, Caregiving & Productivity", "#34d399");
+      baseLabel.position.set(3.1, -2.5, 0);
+      baseLabel.scale.set(3.3, 0.98, 1);
+      group.add(baseLabel);
+
+      // 6 Orbiting Submerged Cost Nodes around the 90% Base
+      const hiddenFactors = [
+        "Lost Household Income",
+        "ICU & Pediatric Strain",
+        "Major GDP Losses",
+        "Unemployment & Poverty",
+        "Workforce Productivity",
+        "Emergency Gov Spending"
+      ];
+      const subNodes = [];
+      hiddenFactors.forEach((txt, i) => {
+        const angle = (i / hiddenFactors.length) * Math.PI * 2;
+        const r = 2.4;
+        const y = -1.2 - (i % 3) * 1.15;
+        const sphere = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.24, 0),
+          new THREE.MeshStandardMaterial({ color: 0x34d399, emissive: 0x10b981, emissiveIntensity: 0.6 })
+        );
+        sphere.position.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
+        sphere.userData = {
+          module: 3,
+          badge: "90% Submerged Layer",
+          title: txt,
+          desc: "Part of the 90% indirect economic burden of viral respiratory diseases across African economies."
+        };
+        interactiveObjects.push(sphere);
+        group.add(sphere);
+        subNodes.push({ mesh: sphere, angle, r, y });
+      });
+
+      animatedMixers.push((t) => {
+        if (!group.visible) return;
+        // Gentle iceberg buoyancy bobbing
+        const bob = Math.sin(t * 1.2) * 0.08;
+        tipMesh.position.y = 1.05 + bob;
+        baseMesh.position.y = -2.65 + bob;
+        tipMesh.rotation.y = t * 0.08;
+        baseMesh.rotation.y = t * 0.08;
+
+        subNodes.forEach((n, idx) => {
+          const a = n.angle + t * 0.25;
+          n.mesh.position.x = Math.cos(a) * n.r;
+          n.mesh.position.z = Math.sin(a) * n.r;
+          n.mesh.rotation.y = t * 1.2 + idx;
+        });
+      });
+
+      return group;
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 4: BURDEN DRIVERS & HIGH-RISK POPULATIONS (DUAL ORBITAL SYSTEM)
+    // -------------------------------------------------------------------------
+    function buildModule4_DriversAndRisk(offsetX) {
+      const group = new THREE.Group();
+      group.position.x = offsetX;
+
+      // Central Core: Vulnerable Host Bio-Core
+      const coreMesh = new THREE.Mesh(
+        new THREE.OctahedronGeometry(1.05, 1),
+        new THREE.MeshStandardMaterial({
+          color: 0xf43f5e,
+          emissive: 0xe11d48,
+          emissiveIntensity: 0.45,
+          wireframe: true
+        })
+      );
+      group.add(coreMesh);
+
+      // Inner Ring: 4 High-Risk Populations (Slide 6)
+      const highRiskData = [
+        { title: "Children Under 2", desc: "Severe impacts from RSV and acute bronchiolitis.", color: 0xf43f5e },
+        { title: "Adults Over 65", desc: "High vulnerability to severe Influenza, RSV, and COVID-19 mortality.", color: 0xfb7185 },
+        { title: "Immunocompromised", desc: "Prolonged viral shedding and heightened risk of severe complications.", color: 0xe11d48 },
+        { title: "Chronic Asthma / COPD", desc: "Patients with underlying chronic respiratory conditions.", color: 0xfda4af }
+      ];
+
+      const innerRing = new THREE.TorusGeometry(2.1, 0.03, 12, 64);
+      const innerRingMesh = new THREE.Mesh(innerRing, new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.45 }));
+      innerRingMesh.rotation.x = Math.PI / 2.4;
+      group.add(innerRingMesh);
+
+      const innerNodes = [];
+      highRiskData.forEach((hr, i) => {
+        const angle = (i / highRiskData.length) * Math.PI * 2;
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.32, 16, 16),
+          new THREE.MeshStandardMaterial({ color: hr.color, emissive: hr.color, emissiveIntensity: 0.5 })
+        );
+        mesh.userData = {
+          module: 4,
+          badge: "High-Risk Cohort (Slide 6)",
+          title: hr.title,
+          desc: hr.desc
+        };
+        interactiveObjects.push(mesh);
+        group.add(mesh);
+        innerNodes.push({ mesh, angle, radius: 2.1 });
+      });
+
+      // Outer Ring: 5 Burden Factors in Africa (Slide 5)
+      const driversData = [
+        { title: "1. Population Growth", desc: "Rapid urbanization and overcrowding accelerating airborne transmission.", color: 0xf59e0b },
+        { title: "2. Lifestyle & Housing", desc: "Crowding, indoor air pollution from solid fuels, nutrition, and clean water access.", color: 0x38bdf8 },
+        { title: "3. Limited Treatment", desc: "No antivirals, costly antibiotics for bacterial co-infections, limited diagnostics.", color: 0x22d3ee },
+        { title: "4. Low Vaccination", desc: "Absence of national immunization programs and vaccine hesitancy.", color: 0x10b981 },
+        { title: "5. Age Inequalities", desc: "Disproportionate vulnerability of children <5 and adults over 65.", color: 0xa78bfa }
+      ];
+
+      const outerRing = new THREE.TorusGeometry(3.85, 0.035, 12, 80);
+      const outerRingMesh = new THREE.Mesh(outerRing, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.4 }));
+      outerRingMesh.rotation.x = Math.PI / 2.4;
+      group.add(outerRingMesh);
+
+      const outerNodes = [];
+      driversData.forEach((drv, i) => {
+        const angle = (i / driversData.length) * Math.PI * 2;
+        const mesh = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.42, 0),
+          new THREE.MeshStandardMaterial({ color: drv.color, emissive: drv.color, emissiveIntensity: 0.45 })
+        );
+        mesh.userData = {
+          module: 4,
+          badge: "Burden Driver (Slide 5)",
+          title: drv.title,
+          desc: drv.desc
+        };
+        interactiveObjects.push(mesh);
+        group.add(mesh);
+
+        const lbl = createTextSprite(drv.title, "", `#${drv.color.toString(16).padStart(6, '0')}`);
+        lbl.scale.set(2.2, 0.65, 1);
+        group.add(lbl);
+
+        outerNodes.push({ mesh, lbl, angle, radius: 3.85 });
+      });
+
+      animatedMixers.push((t) => {
+        if (!group.visible) return;
+        coreMesh.rotation.y = t * 0.4;
+        coreMesh.rotation.z = t * 0.25;
+
+        innerNodes.forEach((n) => {
+          const a = n.angle + t * 0.45;
+          n.mesh.position.set(Math.cos(a) * n.radius, Math.sin(a) * 0.55, Math.sin(a) * n.radius);
+        });
+
+        outerNodes.forEach((n) => {
+          const a = n.angle - t * 0.22;
+          const x = Math.cos(a) * n.radius;
+          const y = Math.sin(a) * 0.95;
+          const z = Math.sin(a) * n.radius;
+          n.mesh.position.set(x, y, z);
+          n.mesh.rotation.y = t * 0.6;
+          n.lbl.position.set(x, y - 0.65, z);
+        });
+      });
+
+      return group;
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 5: POLICY IMPLICATIONS — 3 ARCHITECTURAL STRATEGIC PILLARS
+    // -------------------------------------------------------------------------
+    function buildModule5_PolicyPillars(offsetX) {
+      const group = new THREE.Group();
+      group.position.x = offsetX;
+
+      // Foundation Base Pedestal
+      const baseSlab = new THREE.Mesh(
+        new THREE.BoxGeometry(9.6, 0.35, 3.8),
+        new THREE.MeshStandardMaterial({ color: 0x0f2942, roughness: 0.3, metalness: 0.6 })
+      );
+      baseSlab.position.y = -1.6;
+      group.add(baseSlab);
+
+      // Top Architrave Beam ("African Health Security & Resilience")
+      const topBeam = new THREE.Mesh(
+        new THREE.BoxGeometry(9.8, 0.42, 4.0),
+        new THREE.MeshStandardMaterial({
+          color: 0x10b981,
+          emissive: 0x059669,
+          emissiveIntensity: 0.35,
+          roughness: 0.25
+        })
+      );
+      topBeam.position.y = 3.1;
+      group.add(topBeam);
+
+      const topLabel = createTextSprite("Continental Respiratory Resilience", "CPHIA 2026 Policy Framework", "#34d399");
+      topLabel.position.set(0, 3.85, 0);
+      topLabel.scale.set(4.2, 1.15, 1);
+      group.add(topLabel);
+
+      const pillars = [
+        {
+          x: -3.1,
+          color: 0x10b981,
+          title: "1. Global Tracking",
+          sub: "Surveillance & Labs",
+          badge: "Policy Pillar 01",
+          desc: "Strengthening integrated respiratory virus surveillance systems & expanding laboratory diagnostic capacity."
+        },
+        {
+          x: 0.0,
+          color: 0x22d3ee,
+          title: "2. Vaccines & Antivirals",
+          sub: "RSV mAbs & Seasonal Flu",
+          badge: "Policy Pillar 02",
+          desc: "Seasonal influenza uptake in high-risk groups; maternal RSV vaccines & long-acting monoclonal antibodies; maintaining COVID-19 vaccination."
+        },
+        {
+          x: 3.1,
+          color: 0xf59e0b,
+          title: "3. Zoonotic Readiness",
+          sub: "Regional Manufacturing",
+          badge: "Policy Pillar 03",
+          desc: "Investing in pandemic preparedness and building regional vaccine manufacturing capacity across Africa."
+        }
+      ];
+
+      const beaconOrbs = [];
+      pillars.forEach((p) => {
+        // Fluted Cylinder Column
+        const colGeo = new THREE.CylinderGeometry(0.68, 0.78, 4.35, 16);
+        const colMat = new THREE.MeshStandardMaterial({
+          color: p.color,
+          emissive: p.color,
+          emissiveIntensity: 0.3,
+          roughness: 0.25,
+          metalness: 0.35,
+          transparent: true,
+          opacity: 0.9
+        });
+        const colMesh = new THREE.Mesh(colGeo, colMat);
+        colMesh.position.set(p.x, 0.72, 0);
+        colMesh.userData = {
+          module: 5,
+          badge: p.badge,
+          title: p.title,
+          desc: p.desc
+        };
+        interactiveObjects.push(colMesh);
+        group.add(colMesh);
+
+        // Orbiting Energy Ring around each Pillar
+        const orb = new THREE.Mesh(
+          new THREE.TorusGeometry(1.05, 0.04, 12, 40),
+          new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 })
+        );
+        orb.rotation.x = Math.PI / 2;
+        orb.position.set(p.x, 0.72, 0);
+        group.add(orb);
+        beaconOrbs.push(orb);
+
+        const lbl = createTextSprite(p.title, p.sub, `#${p.color.toString(16).padStart(6, '0')}`);
+        lbl.position.set(p.x, -2.25, 1.3);
+        lbl.scale.set(2.7, 0.85, 1);
+        group.add(lbl);
+      });
+
+      animatedMixers.push((t) => {
+        if (!group.visible) return;
+        beaconOrbs.forEach((orb, i) => {
+          orb.position.y = 0.72 + Math.sin(t * 1.8 + i * 1.5) * 1.65;
+        });
+      });
+
+      return group;
+    }
+
+    // --- NAVIGATION & INTERACTIVITY CONTROLLERS ---
+    function switchModule(index) {
+      currentModule = index;
+
+      // Toggle 3D Scene Group Visibility
+      moduleGroups.forEach((grp, idx) => {
+        grp.visible = (idx === index);
+      });
+
+      // Update Bottom Dock Active States
+      document.querySelectorAll('.mod-btn').forEach((btn) => {
+        const modIdx = parseInt(btn.getAttribute('data-mod'), 10);
+        if (modIdx === index) {
+          btn.classList.add('active');
+          btn.classList.remove('text-slate-300');
+        } else {
+          btn.classList.remove('active');
+          btn.classList.add('text-slate-300');
+        }
+      });
+
+      // Render HUD Card Content
+      const modData = MODULES_DATA[index];
+      document.getElementById('hud-card').innerHTML = modData.renderHTML();
+
+      // Update Contextual Scene Controls on Bottom-Right
+      renderContextualControls(index);
+
+      // Smooth Camera Flight
+      const isMobile = window.innerWidth < 640;
+      const pos = modData.cameraPos;
+      const look = modData.lookAt;
+      camTargetPos.set(isMobile ? 0 : pos[0], pos[1], isMobile ? pos[2] + 2.5 : pos[2]);
+      camLookAtTarget.set(isMobile ? 0 : look[0], look[1], look[2]);
+      isTransitioningCamera = true;
+    }
+
+    function renderContextualControls(index) {
+      const container = document.getElementById('scene-controls-bar');
+      container.innerHTML = '';
+
+      if (index === 2) {
+        // Missing Millions: Quick Surveillance Gap Pill
+        container.innerHTML = `
+          <button onclick="toggleSurveillanceGapModel()" class="glass-pill rounded-xl px-3.5 py-2 text-xs font-semibold ${showSurveillanceGap ? 'border-rose-400 text-rose-300 bg-rose-950/70' : 'text-cyan-300'} flex items-center gap-2 cursor-pointer shadow-lg">
+            <span class="w-2 h-2 rounded-full ${showSurveillanceGap ? 'bg-rose-400 pulse-dot' : 'bg-cyan-400'}"></span>
+            <span>${showSurveillanceGap ? 'Hide True Burden Gap' : 'Reveal Missing Millions Gap'}</span>
+          </button>
+        `;
+      } else if (index === 3) {
+        // Economic Iceberg: Quick Dive Pill
+        container.innerHTML = `
+          <button onclick="toggleIcebergDive()" class="glass-pill rounded-xl px-3.5 py-2 text-xs font-semibold text-emerald-300 flex items-center gap-2 cursor-pointer shadow-lg">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+            <span>${icebergSubmergedView ? 'Ascend to 10% Tip' : 'Submerge to 90% Depth'}</span>
+          </button>
+        `;
+      }
+    }
+
+    function focusViralNode(viralId) {
+      const map = {
+        rsv: { pos: [-1.5, 2.2, 7.5], look: [-1.2, 1.5, 1.4] },
+        covid: { pos: [5.2, 2.0, 7.5], look: [5.0, 1.2, 1.2] },
+        flu: { pos: [2.2, -1.8, 7.8], look: [2.2, -2.5, 1.9] }
+      };
+      if (map[viralId]) {
+        camTargetPos.set(...map[viralId].pos);
+        camLookAtTarget.set(...map[viralId].look);
+        isTransitioningCamera = true;
+      }
+    }
+
+    function toggleSurveillanceGapModel() {
+      showSurveillanceGap = !showSurveillanceGap;
+      if (surveillanceGapMesh) surveillanceGapMesh.visible = showSurveillanceGap;
+      if (surveillanceGapLabel) surveillanceGapLabel.visible = showSurveillanceGap;
+      // Refresh HUD & contextual pill
+      document.getElementById('hud-card').innerHTML = MODULES_DATA[2].renderHTML();
+      renderContextualControls(2);
+    }
+
+    function toggleIcebergDive() {
+      icebergSubmergedView = !icebergSubmergedView;
+      icebergDepthRatio = icebergSubmergedView ? 0.85 : 0.15;
+      applyIcebergCameraDepth();
+      document.getElementById('hud-card').innerHTML = MODULES_DATA[3].renderHTML();
+      renderContextualControls(3);
+    }
+
+    function setIcebergDepth(val) {
+      icebergDepthRatio = parseInt(val, 10) / 100;
+      icebergSubmergedView = icebergDepthRatio > 0.5;
+      applyIcebergCameraDepth();
+    }
+
+    function applyIcebergCameraDepth() {
+      const yPos = 2.6 - icebergDepthRatio * 5.8; // +2.6 above water down to -3.2 underwater
+      const yLook = 0.6 - icebergDepthRatio * 3.4;
+      camTargetPos.set(0, yPos, 12.5);
+      camLookAtTarget.set(window.innerWidth >= 640 ? -1.2 : 0, yLook, 0);
+      isTransitioningCamera = true;
+    }
+
+    function resetCameraView() {
+      switchModule(currentModule);
+    }
+
+    function toggleHudPanel() {
+      hudVisible = !hudVisible;
+      const panel = document.getElementById('hud-panel');
+      const label = document.getElementById('hud-toggle-text');
+      if (hudVisible) {
+        panel.style.opacity = '1';
+        panel.style.transform = 'translateX(0)';
+        panel.classList.remove('pointer-events-none');
+        if (label) label.textContent = 'Hide Panel';
+      } else {
+        panel.style.opacity = '0';
+        panel.style.transform = 'translateX(-24px)';
+        if (label) label.textContent = 'Show Panel';
+      }
+    }
+
+    function toggleAutoTour() {
+      autoTourActive = !autoTourActive;
+      const indicator = document.getElementById('tour-indicator');
+      const label = document.getElementById('tour-label');
+
+      if (autoTourActive) {
+        indicator.classList.remove('bg-slate-400');
+        indicator.classList.add('bg-emerald-400', 'pulse-dot');
+        label.textContent = 'Touring...';
+        autoTourTimer = setInterval(() => {
+          const next = (currentModule + 1) % MODULES_DATA.length;
+          switchModule(next);
+        }, 8500);
+      } else {
+        indicator.classList.add('bg-slate-400');
+        indicator.classList.remove('bg-emerald-400', 'pulse-dot');
+        label.textContent = 'Auto-Tour';
+        clearInterval(autoTourTimer);
+      }
+    }
+
+    // --- RAYCASTING (HOVER TOOLTIP & CLICK INSPECTION) ---
+    function onPointerMove(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      const tooltip = document.getElementById('tooltip-3d');
+      raycaster.setFromCamera(mouse, camera);
+
+      // Filter only objects belonging to active module
+      const activeHits = interactiveObjects.filter(obj => obj.userData.module === currentModule);
+      const intersects = raycaster.intersectObjects(activeHits, false);
+
+      if (intersects.length > 0) {
+        const hitData = intersects[0].object.userData;
+        document.body.style.cursor = 'pointer';
+        document.getElementById('tooltip-badge').textContent = hitData.badge || 'Data Node';
+        document.getElementById('tooltip-title').textContent = hitData.title || '';
+        document.getElementById('tooltip-desc').textContent = hitData.desc || '';
+
+        // Keep tooltip inside viewport bounds
+        const pad = 16;
+        const left = Math.min(window.innerWidth - 330, event.clientX + pad);
+        const top = Math.min(window.innerHeight - 130, event.clientY + pad);
+        tooltip.style.left = `${Math.max(12, left)}px`;
+        tooltip.style.top = `${Math.max(12, top)}px`;
+        tooltip.style.opacity = '1';
+      } else {
+        document.body.style.cursor = 'grab';
+        tooltip.style.opacity = '0';
+      }
+    }
+
+    function onCanvasClick(event) {
+      // Ignore clicks on UI elements
+      if (event.target.closest('button') || event.target.closest('#hud-card') || event.target.closest('nav')) return;
+
+      raycaster.setFromCamera(mouse, camera);
+      const activeHits = interactiveObjects.filter(obj => obj.userData.module === currentModule);
+      const intersects = raycaster.intersectObjects(activeHits, false);
+
+      if (intersects.length > 0) {
+        const data = intersects[0].object.userData;
+        if (data.viralId) {
+          focusViralNode(data.viralId);
+        }
+        // Highlight selected item inside HUD
+        const hudCard = document.getElementById('hud-card');
+        const existingPin = document.getElementById('pinned-inspector');
+        if (existingPin) existingPin.remove();
+
+        const pin = document.createElement('div');
+        pin.id = 'pinned-inspector';
+        pin.className = 'rounded-xl bg-cyan-500/20 border border-cyan-400 p-3 animate-pulse';
+        pin.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-mono uppercase text-cyan-300">${data.badge}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="text-xs text-slate-300 hover:text-white cursor-pointer">✕</button>
+          </div>
+          <div class="text-xs font-bold text-white mt-0.5">${data.title}</div>
+          <p class="text-[11px] text-slate-200 mt-1">${data.desc}</p>
+        `;
+        hudCard.prepend(pin);
+        setTimeout(() => pin.classList.remove('animate-pulse'), 1000);
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      const offsetX = window.innerWidth >= 640 ? 2.1 : 0;
+      moduleGroups.forEach(grp => {
+        grp.position.x = offsetX;
+      });
+    }
+
+    // --- MAIN RENDER & ANIMATION LOOP ---
+    function animateLoop() {
+      requestAnimationFrame(animateLoop);
+      const elapsedTime = clock.getElapsedTime();
+
+      // Rotate ambient bio-particles slowly
+      if (starfieldMesh) {
+        starfieldMesh.rotation.y = elapsedTime * 0.025;
+      }
+
+      // Run active module animations
+      animatedMixers.forEach(fn => fn(elapsedTime));
+
+      // Smooth Camera Interpolation
+      if (isTransitioningCamera) {
+        camera.position.lerp(camTargetPos, 0.055);
+        controls.target.lerp(camLookAtTarget, 0.055);
+        if (camera.position.distanceTo(camTargetPos) < 0.05) {
+          isTransitioningCamera = false;
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
